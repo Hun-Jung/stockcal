@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>월 적립식 복리 계산기</title>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Pretendard', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f4f9ff;
+      color: #1f2d3d;
+    }
+    .container {
+      max-width: 700px;
+      margin: auto;
+      padding: 2rem 1rem;
+    }
+    h1 {
+      text-align: center;
+      font-size: 2.5rem;
+      color: #3399ff;
+    }
+    label {
+      display: block;
+      margin: 1rem 0 0.3rem;
+      font-size: 1.2rem;
+    }
+    input, select {
+      width: 100%;
+      padding: 0.6rem;
+      font-size: 1rem;
+      border: 2px solid #cce4ff;
+      border-radius: 10px;
+      background: #eaf4ff;
+    }
+    input[type="text"] {
+      text-align: left;
+    }
+    button {
+      margin-top: 1.5rem;
+      width: 100%;
+      padding: 1rem;
+      font-size: 1.2rem;
+      background-color: #3399ff;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: 0.3s ease;
+    }
+    button:hover {
+      background-color: #267fd9;
+    }
+    .results {
+      margin-top: 2rem;
+      background: #dceeff;
+      padding: 1rem;
+      border-radius: 15px;
+      font-size: 1rem;
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: center;
+    }
+    th, td {
+      padding: 0.5rem;
+      border-bottom: 1px solid #b2d9ff;
+    }
+    th {
+      background-color: #b2d9ff;
+    }
+    h2 {
+      margin-top: 3rem;
+      color: #3399ff;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>월 적립식 복리 계산기<br><span style="font-size: 1.2rem; color: #3399ff;">(미국 주식 기준)</span></h1>
+
+    <label for="monthly">월 투자 금액 (원):</label>
+    <input type="text" id="monthly" placeholder="예: 300,000" value="300,000" oninput="formatInputNumber(this)" />
+
+    <label for="rate">연 수익률 (%):</label>
+    <input type="number" id="rate" placeholder="예: 6" value="6" />
+
+    <label for="years">투자 기간 (년):</label>
+    <input type="number" id="years" placeholder="예: 10" value="10" />
+
+    <label for="dividend">연 배당률 (%):</label>
+    <input type="number" id="dividend" placeholder="예: 2" value="2" />
+
+    <label for="dividendGrowth">배당 성장률 (%):</label>
+    <input type="number" id="dividendGrowth" placeholder="입력하지 않아도 계산 가능" />
+
+    <label for="reinvest">배당금 재투자 여부:</label>
+    <select id="reinvest">
+      <option value="yes">재투자</option>
+      <option value="no">재투자 안 함</option>
+    </select>
+
+    <button onclick="calculate()">계산하기</button>
+
+    <div class="results" id="results"></div>
+  </div>
+
+  <script>
+    function formatInputNumber(el) {
+      const raw = el.value.replace(/[^\d]/g, '');
+      if (raw) el.value = Number(raw).toLocaleString();
+    }
+
+    function parseInputNumber(str) {
+      return parseFloat(str.replace(/,/g, ''));
+    }
+
+    function formatWithUnits(num) {
+      const units = ['원', '만', '억', '조'];
+      let unitIndex = 0;
+      let value = Math.round(num / 1000) * 1000;
+      while (value >= 10000 && unitIndex < units.length - 1) {
+        value /= 10000;
+        unitIndex++;
+      }
+      return value.toLocaleString(undefined, { maximumFractionDigits: 2 }) + units[unitIndex];
+    }
+
+    function calculate() {
+      const monthly = parseInputNumber(document.getElementById('monthly').value);
+      const rate = parseFloat(document.getElementById('rate').value);
+      const years = parseInt(document.getElementById('years').value);
+      const dividend = parseFloat(document.getElementById('dividend').value);
+      const dividendGrowth = parseFloat(document.getElementById('dividendGrowth').value) || 0;
+      const reinvest = document.getElementById('reinvest').value === 'yes';
+
+      if (isNaN(monthly) || isNaN(rate) || isNaN(years) || isNaN(dividend)) {
+        alert("모든 필수 항목을 올바르게 입력해주세요.");
+        return;
+      }
+
+      const usDividendTaxRate = 0.15;
+      let totalPrincipal = 0;
+      let totalAmount = 0;
+      let currentDividendRate = dividend / 100 / 4;
+      const quarterlyDividendGrowth = dividendGrowth / 100;
+      const monthlyRate = rate / 100 / 12;
+
+      const labels = [];
+      const principalData = [];
+      const totalData = [];
+      const dividendData = [];
+      const returnRateData = [];
+      const profitData = [];
+
+      let tableHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>년도</th>
+              <th>투자 원금</th>
+              <th>수익</th>
+              <th>총 자산</th>
+              <th>세후 월 배당금</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      for (let year = 1; year <= years; year++) {
+        let yearlyDividendBeforeTax = 0;
+        for (let month = 1; month <= 12; month++) {
+          totalPrincipal += monthly;
+          totalAmount = totalAmount * (1 + monthlyRate) + monthly;
+          if (month % 3 === 0) {
+            const dividendPayment = totalAmount * currentDividendRate;
+            yearlyDividendBeforeTax += dividendPayment;
+            if (reinvest) totalAmount += dividendPayment * (1 - usDividendTaxRate);
+          }
+        }
+        if (dividendGrowth > 0) currentDividendRate *= (1 + quarterlyDividendGrowth);
+
+        const profit = totalAmount - totalPrincipal;
+        const monthlyDividendAfterTax = (yearlyDividendBeforeTax * (1 - usDividendTaxRate)) / 12;
+        const rateOfReturn = (totalPrincipal > 0) ? (profit / totalPrincipal) * 100 : 0;
+
+        labels.push(`${year}년`);
+        principalData.push(Math.round(totalPrincipal));
+        totalData.push(Math.round(totalAmount));
+        dividendData.push(Math.round(monthlyDividendAfterTax));
+        returnRateData.push(rateOfReturn);
+        profitData.push(Math.round(profit));
+
+        tableHTML += `
+          <tr>
+            <td>${year}년</td>
+            <td>${formatWithUnits(totalPrincipal)}</td>
+            <td>${formatWithUnits(profit)}</td>
+            <td>${formatWithUnits(totalAmount)}</td>
+            <td>${formatWithUnits(monthlyDividendAfterTax)}</td>
+          </tr>
+        `;
+      }
+
+      tableHTML += '</tbody></table>';
+      document.getElementById('results').innerHTML = tableHTML;
+    }
+
+    window.onload = () => {
+      calculate();
+    };
+  </script>
+</body>
+</html>
